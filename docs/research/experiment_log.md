@@ -310,8 +310,66 @@ Top features by gain (graph model, seed 55): log_amt 0.328, pair_prior 0.276, fw
 
 **Decision:** LightGBM frozen (300 trees, 15 leaves, 5 seeds). No more tuning on HI-Small test. Next: replicate on LI-Small with this exact config.
 
-## Run 10 and Run 11 - TODO (LI-Small replication, frozen config)
+## Run 10 - LI-Small replication, all features (frozen config)
 
-- **Setup:** `python -m scripts.diagnose LI-Small` first (check rows per day vs MIN_ROWS), then parse_patterns, then train_graph. Run 10 with DROP = (), Run 11 with DROP = ("src_gap_s", "src_prior_out"). No setting changes.
-- **Question:** does base-vs-graph separation hold on a different dataset with a lower illicit ratio?
-- **Results:** (paste)
+- **Date:** 6 November 2026
+- **Commit:** f253b00
+- **Command:** `python -m scripts.train_graph LI-Small` (DROP = ())
+- **Settings:** same as Run 08: 300 trees, 15 leaves, min_child_samples 200, reg_lambda 10, seeds 11, 22, 33, 44, 55. No changes.
+- **Data:** LI-Small, 6,924,049 rows, 3,565 laundering edges. Only 28.7% have a typology (1,023). Test: 3 full days, 791 laundering edges, 582 unlabelled (74%; HI-Small was 40%).
+
+| Metric (3 full test days) | Base | Base + graph |
+|---|---:|---:|
+| PR-AUC, ensemble | 0.0663 | 0.0452 |
+| PR-AUC per seed (test) | 0.045, 0.028, 0.024, 0.014, 0.005 | 0.015, 0.027, 0.019, 0.017, 0.021 |
+| PR-AUC per seed (val) | 0.051, 0.041, 0.042, 0.018, 0.048 | 0.032, 0.041, 0.038, 0.028, 0.031 |
+| Minority F1 | 0.0787 | 0.0977 |
+| Flagged | 124 | 1,358 |
+| Recall at K=100/day | 8.7% | 4.8% |
+| Recall at K=300/day | 12.4% | 10.4% |
+| Recall at K=1000/day | 19.3% | 21.1% |
+| True per 100 reviewed, K=100 | 23.0 | 12.7 |
+| True per 100 reviewed, K=300 | 10.9 | 9.1 |
+| True per 100 reviewed, K=1000 | 5.1 | 5.6 |
+
+Recall by typology, top 1,000 alerts (base / graph, n): BIPARTITE 0.500 / 0.316 (38), CYCLE 0.421 / 0.474 (19), FAN-IN 0.286 / 0.143 (7), FAN-OUT 0.429 / 0.179 (28), GATHER-SCATTER 0.344 / 0.250 (32), RANDOM 0.300 / 0.200 (20), SCATTER-GATHER 0.239 / 0.326 (46), STACK 0.526 / 0.368 (19), UNLABELLED 0.031 / 0.040 (582).
+Cycle check: 2.1% of laundering edges close a cycle vs 0.1% of clean edges. By typology: CYCLE 0.105, STACK 0.105, SCATTER-GATHER 0.043, all others 0.
+Top features by gain (graph model, seed 55): log_amt 0.314, pair_prior 0.162, fwd_ratio 0.095, fmt 0.094, src_out_d_24h 0.075.
+
+**What I think it means:** the HI-Small result did not replicate with all features: base and graph are about equal, with graph slightly worse on several numbers. Absolute scores are very low (PR-AUC 0.05-0.07 vs 0.4 on HI-Small). 74% of test laundering edges have no typology label, so pattern features have little to see, and typology groups are tiny (n = 7-46), so per-typology numbers are noise. The comparison that decided the HI-Small result (dropping src_gap_s and src_prior_out) is Run 11.
+
+## Run 11 - LI-Small, drop src_gap_s and src_prior_out
+
+- **Date:** (fill in)
+- **Commit:** (fill in)
+- **Command:** `python -m scripts.train_graph LI-Small` (DROP = ("src_gap_s", "src_prior_out")), otherwise as Run 10 (frozen config).
+
+| Metric (3 full test days, 791 laundering edges) | Base | Base + graph |
+|---|---:|---:|
+| PR-AUC, ensemble | 0.0248 | 0.0917 |
+| PR-AUC per seed (test) | 0.015, 0.009, 0.029, 0.016, 0.015 | 0.032, 0.100, 0.055, 0.055, 0.023 |
+| PR-AUC per seed (val) | 0.035, 0.013, 0.034, 0.022, 0.023 | 0.052, 0.115, 0.031, 0.101, 0.030 |
+| Minority F1 | 0.0590 | 0.1367 |
+| Flagged | 836 | 277 |
+| Recall at K=100/day | 4.0% | 11.0% |
+| Recall at K=300/day | 7.0% | 16.2% |
+| Recall at K=1000/day | 15.4% | 27.8% |
+| True per 100 reviewed, K=100 | 10.7 | 29.0 |
+| True per 100 reviewed, K=300 | 6.1 | 14.2 |
+| True per 100 reviewed, K=1000 | 4.1 | 7.3 |
+
+Recall by typology, top 1,000 alerts (base / graph, n): BIPARTITE 0.211 / 0.579 (38), CYCLE 0.211 / 0.684 (19), FAN-IN 0.143 / 0.571 (7), FAN-OUT 0.107 / 0.357 (28), GATHER-SCATTER 0.188 / 0.688 (32), RANDOM 0.350 / 0.400 (20), SCATTER-GATHER 0.217 / 0.435 (46), STACK 0.211 / 0.632 (19), UNLABELLED 0.029 / 0.048 (582).
+Top features by gain (graph model, seed 55): fwd_ratio 0.279, pair_prior 0.215, log_amt 0.176, fmt 0.128, dst_in_n_3h 0.042.
+
+### Frozen-config summary (ensemble PR-AUC, 3 full test days)
+
+| Dataset | Features | Base | Base + graph |
+|---|---|---:|---:|
+| HI-Small (Runs 08, 09) | all | 0.415 | 0.438 |
+| HI-Small | without src_gap_s, src_prior_out | 0.095 | 0.449 |
+| LI-Small (Runs 10, 11) | all | 0.066 | 0.045 |
+| LI-Small | without src_gap_s, src_prior_out | 0.025 | 0.092 |
+
+**What I think it means:** the HI-Small pattern repeats on LI-Small. With the two timing/count features, base and graph are about equal. Without them, the base model collapses and the graph model holds. The graph model without those two features matches or beats the best plain baseline on both datasets (0.449 vs 0.415, 0.092 vs 0.066). Limits: seeds overlap a little on LI-Small (graph min 0.023, base max 0.029), absolute scores are low, 74% of test laundering edges on LI-Small are unlabelled, typology groups are tiny (n = 7-46), and each test set is only 3 days.
+
+**Decision:** the main system model is "base features minus src_gap_s and src_prior_out, plus graph features" (DROP = both). Report the all-features comparison too.
