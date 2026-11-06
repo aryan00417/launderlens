@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports: ["5432:5432"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  ml:
+    build: ./ml-service
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./models:/models
+      - ./ml-service/app:/srv/app
+    ports: ["8000:8000"]
+
+  backend:
+    build: ./backend
+    env_file: .env
+    depends_on: [db, redis, ml]
+    volumes:
+      - ./backend/src:/srv/src
+    ports: ["4000:4000"]
+
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    volumes:
+      - ./frontend/src:/srv/src
+    ports: ["5173:5173"]
+
+volumes:
+  pgdata:
