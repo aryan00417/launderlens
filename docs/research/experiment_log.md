@@ -13,7 +13,7 @@ Open questions
 ## Run 01 - first baseline (SUPERSEDED by Run 02)
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Superseded because:** the metrics include 8 near-empty tail days (11-18 Sep, under 400 transactions per day, 655 of the 1,797 test positives). Those days are over half laundering, so PR-AUC, F1 and Recall@K are inflated. Kept for the record only.
 - **Note on Recall@K:** in this run K is alerts reviewed per day (K=10, 50, 200), not a global top-K. At K=10 the 11 test days allow only 110 reviews, so recall cannot exceed about 6%.
 
@@ -93,7 +93,7 @@ LightGBM recall by typology (all test rows):
 ## Run 02 - corrected baseline
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_baseline HI-Small`
 - **Change from Run 01:** metrics computed on full test days only (rows >= 100,000 per day: 3 days, 1,142 laundering edges). K = 100, 300, 1000 alerts per day.
 - **LightGBM settings:** 400 trees, learning rate 0.05, 63 leaves, scale_pos_weight capped at 50, colsample 0.8, no row bagging (subsample has no effect without subsample_freq), seeds 11, 22, 33, 44, 55 averaged.
@@ -120,7 +120,7 @@ Per-typology recall: same table as Run 01 (computed on all test rows).
 ## Run 03 - graph features (PROVISIONAL, not comparable with Run 02)
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small`
 - **Graph features:** windows 3h and 24h, cycle window 72h, max cycle length 5, neighbour cap 30, search budget 80. Build time about 135 s. Cached in data/processed/HI-Small_graphfeat.parquet.
 - **Known problem:** LightGBM ran with subsample_freq=1 (row bagging on) and 3 seeds (11, 22, 33). Run 02 had no bagging and 5 seeds. The base model fell from PR-AUC 0.160 to 0.047, so numbers here must not be compared with Run 02. The base-vs-graph comparison inside this run uses identical settings.
@@ -160,7 +160,7 @@ Top features by gain (graph model): src_gap_s 0.518, src_prior_out 0.116, src_si
 ## Run 04 - graph features, no bagging, 5 seeds
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small` (DROP = ())
 - **Settings:** same LightGBM as Run 02 (400 trees, 63 leaves, no row bagging), seeds 11, 22, 33, 44, 55. Scores averaged over seeds, then evaluated on the 3 full test days (1,142 laundering edges).
 - **Prediction that failed:** I expected base PR-AUC to return to about 0.16 (Run 02). It came back at 0.22 with the same settings, so results are not reproducible to within about 0.06.
@@ -187,7 +187,7 @@ Top features by gain: log_amt 0.536, pair_prior 0.089, hour 0.063, src_gap_s 0.0
 ## Run 05 - ablation: drop src_gap_s and src_prior_out
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small` (DROP = ("src_gap_s", "src_prior_out")), otherwise as Run 04.
 
 | Metric | Base | Base + graph |
@@ -211,7 +211,7 @@ Top features by gain: fwd_ratio 0.271, src_since_last_in_s 0.209, pair_prior 0.0
 ## Run 06 - regularised LightGBM with early stopping, all features
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small` (DROP = ())
 - **Settings:** 15 leaves, min_child_samples 200, reg_lambda 10, up to 1,000 trees, early stopping (50 rounds) on val average precision, deterministic, seeds 11, 22, 33, 44, 55.
 - **Trees used (base):** 3, 2, 1000, 673, 3. **(graph):** 9, 2, 996, 507, 22. Early stopping is erratic.
@@ -234,7 +234,7 @@ Feature importance is from the last seed's model (22 trees): not reliable.
 ## Run 07 - regularised, drop src_gap_s and src_prior_out
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small` (DROP = ("src_gap_s", "src_prior_out")), otherwise as Run 06.
 - **Trees used (base):** 436, 14, 325, 529, 634. **(graph):** 594, 998, 4, 251, 997.
 
@@ -258,7 +258,7 @@ Top features by gain (graph model, seed 55, 997 trees): log_amt 0.325, pair_prio
 ## Run 08 - fixed 300 trees, all features
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small` (DROP = ())
 - **Settings:** 300 trees, learning rate 0.05, 15 leaves, min_child_samples 200, reg_lambda 10, colsample 0.8, deterministic, seeds 11, 22, 33, 44, 55. No early stopping.
 
@@ -281,7 +281,7 @@ Recall by typology, top 1,000 alerts (base / graph): BIPARTITE 0.692 / 0.769, CY
 ## Run 09 - fixed 300 trees, drop src_gap_s and src_prior_out
 
 - **Date:** 5 November 2026
-- **Commit:** (fill in)
+- **Commit:** f253b00
 - **Command:** `python -m scripts.train_graph HI-Small` (DROP = ("src_gap_s", "src_prior_out")), otherwise as Run 08.
 
 | Metric (3 full test days) | Base | Base + graph |
