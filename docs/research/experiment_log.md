@@ -373,3 +373,54 @@ Top features by gain (graph model, seed 55): fwd_ratio 0.279, pair_prior 0.215, 
 **What I think it means:** the HI-Small pattern repeats on LI-Small. With the two timing/count features, base and graph are about equal. Without them, the base model collapses and the graph model holds. The graph model without those two features matches or beats the best plain baseline on both datasets (0.449 vs 0.415, 0.092 vs 0.066). Limits: seeds overlap a little on LI-Small (graph min 0.023, base max 0.029), absolute scores are low, 74% of test laundering edges on LI-Small are unlabelled, typology groups are tiny (n = 7-46), and each test set is only 3 days.
 
 **Decision:** the main system model is "base features minus src_gap_s and src_prior_out, plus graph features" (DROP = both). Report the all-features comparison too.
+
+
+---
+
+## Run 12 - alert prioritisation on HI-Small (final model)
+
+- **Date:** (fill in)
+- **Commit:** (fill in)
+- **Commands:** `python -m scripts.train_final HI-Small`, then `python -m scripts.prioritise HI-Small`
+- **Model:** frozen config (300 trees, 15 leaves, 5 seeds averaged), without src_gap_s and src_prior_out, plus graph features. Calibration (Platt scaling) and conformal bands fitted on the validation days (1,015,669 rows, 1,082 laundering). Evaluated on 3 full test days (1,014,561 rows, 1,142 laundering).
+- **Reproducibility:** K=100/day gives recall 22.8% and 86.7 real per 100, same as Run 09.
+
+### Calibration
+
+Brier score 0.003985 (raw) to 0.000806 (calibrated). Calibration error 0.01312 to 0.00026.
+
+| Range (calibrated) | Rows | Avg predicted | Actual rate |
+|---|---:|---:|---:|
+| 0 to 0.001 | 901,688 | 0.0000 | 0.0000 |
+| 0.001 to 0.01 | 102,901 | 0.0026 | 0.0023 |
+| 0.01 to 0.05 | 6,874 | 0.0224 | 0.0310 |
+| 0.05 to 0.2 | 2,162 | 0.0904 | 0.0930 |
+| 0.2 to 0.5 | 386 | 0.3096 | 0.1244 |
+| 0.5 to 1 | 550 | 0.8910 | 0.7309 |
+
+Top 200 alerts per day, real cases expected vs found: 8 Sep 68.7 vs 80, 9 Sep 175.2 vs 171, 10 Sep 196.1 vs 164 (total 440 vs 415).
+
+### Daily review budget (test days)
+
+| K per day | Recall | Real per 100 reviewed | Max possible recall |
+|---:|---:|---:|---:|
+| 25 | 6.5% | 98.7 | 6.6% |
+| 50 | 12.8% | 97.3 | 13.1% |
+| 100 | 22.8% | 86.7 | 26.3% |
+| 200 | 36.3% | 69.2 | 52.5% |
+| 300 | 40.7% | 51.7 | 78.8% |
+| 500 | 46.6% | 35.5 | 100% |
+
+Baselines: largest amount first 0.0-0.2% recall and 0.1-0.3 real per 100 at every K; random 0.
+
+### Conformal bands (alpha_pos 0.20, alpha_neg 0.0005)
+
+- Real laundering still inside the "could be laundering" set: 0.786 (target 0.80).
+- Clean rows reaching "confident alert" level: 0.00091 (target at most 0.0005).
+
+| Band (top 200 per day, 3 days) | Alerts | Real | Real per 100 |
+|---|---:|---:|---:|
+| confident alert | 511 | 401 | 78.5 |
+| uncertain | 89 | 14 | 15.7 |
+
+**What I think it means:** calibration works in the middle ranges but is overconfident at the top (0.89 predicted vs 0.73 real), and daily totals are off by up to 20% because the laundering rate changes from day to day. At 100 alerts a day the model finds 87% of the most any ranking could. The two naive baselines are weak; a rules baseline and the plain LightGBM are the fair comparisons (Run 09 plain LightGBM at K=100: 7.5% recall, 28.7 real per 100). The conformal promise holds for real laundering (78.6% vs 80%) but is about 1.8 times too loose on false alarms, most likely because the test days differ from the validation days. The bands split the queue into groups with a 5 times difference in real cases per 100. Each alert is one transaction, so alerts from the same laundering chain are counted separately; next step is grouping alerts into cases and counting cases.
