@@ -313,7 +313,7 @@ Top features by gain (graph model, seed 55): log_amt 0.328, pair_prior 0.276, fw
 ## Run 10 - LI-Small replication, all features (frozen config)
 
 - **Date:** 6 November 2026
-- **Commit:** f253b00
+- **Commit:** 208184a
 - **Command:** `python -m scripts.train_graph LI-Small` (DROP = ())
 - **Settings:** same as Run 08: 300 trees, 15 leaves, min_child_samples 200, reg_lambda 10, seeds 11, 22, 33, 44, 55. No changes.
 - **Data:** LI-Small, 6,924,049 rows, 3,565 laundering edges. Only 28.7% have a typology (1,023). Test: 3 full days, 791 laundering edges, 582 unlabelled (74%; HI-Small was 40%).
@@ -340,8 +340,8 @@ Top features by gain (graph model, seed 55): log_amt 0.314, pair_prior 0.162, fw
 
 ## Run 11 - LI-Small, drop src_gap_s and src_prior_out
 
-- **Date:** (fill in)
-- **Commit:** (fill in)
+- **Date:** 6 November 2026
+- **Commit:** 208184a
 - **Command:** `python -m scripts.train_graph LI-Small` (DROP = ("src_gap_s", "src_prior_out")), otherwise as Run 10 (frozen config).
 
 | Metric (3 full test days, 791 laundering edges) | Base | Base + graph |
