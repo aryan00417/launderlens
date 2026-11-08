@@ -5,7 +5,7 @@ from sklearn.linear_model import LogisticRegression
 
 from app.metrics import recall_at_k_per_day
 
-EPS = 1e-6
+EPS = 1e-12
 BINS = [0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.0000001]
 
 

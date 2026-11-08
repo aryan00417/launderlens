@@ -43,6 +43,8 @@ def main(name: str):
         print(t.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
 
     top = te[top_k_flags(te, "p", REVIEW_K)]
+    ties = int(top["p"].duplicated(keep=False).sum())
+    print(f"\nalerts in the top {REVIEW_K}/day that share their probability with another alert: {ties} of {len(top)}")
     per_day = top.groupby("day").agg(reviewed=("p", "size"), model_expected=("p", "sum"), actually_real=("label", "sum"))
     print(f"\nTop {REVIEW_K} alerts per day: real cases the model expected vs found")
     print(per_day.round(1).to_string())
