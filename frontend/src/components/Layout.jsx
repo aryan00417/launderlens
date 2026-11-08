@@ -9,6 +9,7 @@ export default function Layout() {
       <aside className="side">
         <div className="brand">LaunderLens</div>
         <NavLink to="/" end>Overview</NavLink>
+         <NavLink to="/alerts">Alert queue</NavLink>
         <NavLink to="/graph">Graph explorer</NavLink>
         <div className="spacer" />
         <div className="who">{user?.name}<br /><small>{user?.role?.replace("_", " ")}</small></div>

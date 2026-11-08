@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.js";
+import alertRoutes from "./routes/alerts.js";
 
 const app = express();
 app.use(cors());
@@ -17,6 +18,7 @@ app.get("/api/health", async (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/alerts", alertRoutes);
 // Later: /api/alerts, /api/cases, /api/graph, /api/reports
 
 const port = process.env.PORT || 4000;

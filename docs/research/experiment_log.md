@@ -424,3 +424,15 @@ Baselines: largest amount first 0.0-0.2% recall and 0.1-0.3 real per 100 at ever
 | uncertain | 89 | 14 | 15.7 |
 
 **What I think it means:** calibration works in the middle ranges but is overconfident at the top (0.89 predicted vs 0.73 real), and daily totals are off by up to 20% because the laundering rate changes from day to day. At 100 alerts a day the model finds 87% of the most any ranking could. The two naive baselines are weak; a rules baseline and the plain LightGBM are the fair comparisons (Run 09 plain LightGBM at K=100: 7.5% recall, 28.7 real per 100). The conformal promise holds for real laundering (78.6% vs 80%) but is about 1.8 times too loose on false alarms, most likely because the test days differ from the validation days. The bands split the queue into groups with a 5 times difference in real cases per 100. Each alert is one transaction, so alerts from the same laundering chain are counted separately; next step is grouping alerts into cases and counting cases.
+
+
+---
+
+## Run 13 - probability tie fix
+
+- **Date:** (fill in)
+- **Commit:** (fill in)
+- **Change:** logit clip in `app/prioritise.py` from 1e-6 to 1e-12. Before, all very confident alerts got the same probability (0.99994948), so their order inside the top group was arbitrary (time order).
+- **Command:** `python -m scripts.prioritise HI-Small` (no retraining)
+- **Result:** alerts in the top 200/day sharing a probability with another alert: 39 of 600. Brier 0.000806 to 0.000804. K=50/day: real per 100 97.3 to 98.0, recall 12.8% to 12.9%. All other budget numbers unchanged. Conformal numbers and band split unchanged (confident 511 alerts, 401 real; uncertain 89 alerts, 14 real).
+- **Remaining ties:** the mean of the 5 models' probabilities reaches 1.0 at float precision for the most confident rows. Fix at the next retrain: save raw log-odds (`predict(raw_score=True)`) instead of probabilities.

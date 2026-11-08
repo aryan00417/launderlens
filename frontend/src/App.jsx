@@ -4,6 +4,7 @@ import Layout from "./components/Layout.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import GraphExplorer from "./pages/GraphExplorer.jsx";
+import Alerts from "./pages/Alerts.jsx";
 
 function Protected({ children }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -15,6 +16,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Protected><Layout /></Protected>}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/alerts" element={<Alerts />} />
         <Route path="/graph" element={<GraphExplorer />} />
         {/* Later: /alerts, /cases, /reports, /monitoring, /admin */}
       </Route>

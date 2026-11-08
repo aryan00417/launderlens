@@ -19,6 +19,10 @@ export async function api(path, options = {}) {
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+    if (res.status === 401 && getToken()) {
+    clearSession();
+    window.location.href = "/login";
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `request failed (${res.status})`);
   return data;
