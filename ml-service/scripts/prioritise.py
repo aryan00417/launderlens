@@ -1,5 +1,5 @@
 """Alert prioritisation on the saved scores: calibration, daily review budget,
-conformal confidence bands. Also saves the alert list for the web app.
+conformal confidence bands, alert groups. Also saves the alert list for the web app.
 
 Run from ml-service/ (after scripts.train_final):   python -m scripts.prioritise HI-Small
 """
@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import brier_score_loss
 
+from app.cases import group_alerts, group_summary
 from app.config import MODEL_DIR, PROCESSED_DIR
 from app.prioritise import (
     ConformalBands, PlattCalibrator, budget_table, reliability_table, top_k_flags,
@@ -63,11 +64,21 @@ def main(name: str):
     print(f"real laundering still inside the 'could be laundering' set: {(p1[pos] > ALPHA_POS).mean():.3f} (target {1 - ALPHA_POS:.2f})")
     print(f"clean rows that reached 'confident alert' level: {(p0[neg] <= ALPHA_NEG).mean():.5f} (target at most {ALPHA_NEG})")
 
-    top = te[top_k_flags(te, "p", REVIEW_K)]
+    top = te[top_k_flags(te, "p", REVIEW_K)].copy()
     g = top.groupby("band").agg(alerts=("label", "size"), real=("label", "sum"))
     g["real per 100"] = (100 * g.real / g.alerts).round(1)
     print(f"\nTop {REVIEW_K} alerts per day, split by band")
     print(g.to_string())
+
+    # 4. alert groups (candidate cases)
+    top["rank"] = top.groupby("day")["p"].rank(method="first", ascending=False).astype(int)
+    top["group"] = group_alerts(top)
+    top["group_size"] = top.groupby("group")["edge_id"].transform("size")
+    s = group_summary(top)
+    print("\n== 4. Alert groups (alerts that share an account on the same day) ==")
+    print(f"{len(top)} alerts form {s['groups']} groups; {s['groups_with_real']} "
+          f"({100 * s['groups_with_real'] / s['groups']:.1f}%) contain at least one real laundering edge")
+    print(f"alerts per group: median {s['median_size']:.0f}, largest {s['max_size']}, single-alert groups {s['singletons']}")
 
     # save for the web app
     out_dir = MODEL_DIR / name
@@ -78,8 +89,8 @@ def main(name: str):
         "alpha_pos": ALPHA_POS, "alpha_neg": ALPHA_NEG,
     }, out_dir / "prioritiser.joblib")
 
-    top = top.assign(rank=top.groupby("day")["p"].rank(method="first", ascending=False).astype(int))
-    alerts = top[["edge_id", "day", "rank", "src", "dst", "amt_paid", "p", "band", "label"]]
+    top["ts"] = top["ts"].dt.strftime("%Y-%m-%d %H:%M")
+    alerts = top[["edge_id", "day", "ts", "rank", "src", "dst", "amt_paid", "p", "band", "group", "group_size", "label"]]
     alerts.sort_values(["day", "rank"]).to_parquet(PROCESSED_DIR / f"{name}_alerts_test.parquet")
     print(f"\nsaved prioritiser to {out_dir} and {len(alerts):,} alerts to {name}_alerts_test.parquet")
 

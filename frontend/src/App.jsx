@@ -5,6 +5,9 @@ import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import GraphExplorer from "./pages/GraphExplorer.jsx";
 import Alerts from "./pages/Alerts.jsx";
+import Cases from "./pages/Cases.jsx";
+import CaseDetail from "./pages/CaseDetail.jsx";
+import Admin from "./pages/Admin.jsx";
 
 function Protected({ children }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -17,8 +20,10 @@ export default function App() {
       <Route element={<Protected><Layout /></Protected>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/alerts" element={<Alerts />} />
+        <Route path="/cases" element={<Cases />} />
+        <Route path="/cases/:id" element={<CaseDetail />} />
         <Route path="/graph" element={<GraphExplorer />} />
-        {/* Later: /alerts, /cases, /reports, /monitoring, /admin */}
+        <Route path="/admin" element={<Admin />} />
       </Route>
     </Routes>
   );

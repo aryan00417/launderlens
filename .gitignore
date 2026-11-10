@@ -11,3 +11,5 @@ models/*
 !models/.gitkeep
 dist/
 .DS_Store
+
+backend/uploads/

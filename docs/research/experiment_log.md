@@ -436,3 +436,46 @@ Baselines: largest amount first 0.0-0.2% recall and 0.1-0.3 real per 100 at ever
 - **Command:** `python -m scripts.prioritise HI-Small` (no retraining)
 - **Result:** alerts in the top 200/day sharing a probability with another alert: 39 of 600. Brier 0.000806 to 0.000804. K=50/day: real per 100 97.3 to 98.0, recall 12.8% to 12.9%. All other budget numbers unchanged. Conformal numbers and band split unchanged (confident 511 alerts, 401 real; uncertain 89 alerts, 14 real).
 - **Remaining ties:** the mean of the 5 models' probabilities reaches 1.0 at float precision for the most confident rows. Fix at the next retrain: save raw log-odds (`predict(raw_score=True)`) instead of probabilities.
+
+---
+
+## Run 14 - evidence subgraphs on HI-Small alerts (first version)
+
+- **Date:** (fill in)
+- **Commit:** (fill in)
+- **Command:** `python -m scripts.build_evidence HI-Small`
+- **Rules (set before looking at data):** fan needs 5 accounts within 24h either side, gather/scatter layers need 3, cycle up to 6 transfers within 72h before / 24h after the alert.
+- **Alerts:** 600 (top 200 per day, 3 days), 415 real, 185 false alarms. Median explanation size 4 transactions (largest 26).
+
+| Rule | Times fired | Of those, real alerts |
+|---|---:|---:|
+| Fan-out | 76 | 97% |
+| Gather-scatter | 120 | 95% |
+| Scatter-gather | 31 | 87% |
+| Chain | 16 | 69% |
+| Fan-in | 66 | 65% |
+| Cycle | 91 | 33% |
+| No pattern | 200 | 58% |
+
+Real alerts are 69% of the queue, so the cycle rule is worse than no information. It caught 3 of 26 true CYCLE alerts (11.5%). Expected rule fired for the other types: fan-out 39%, fan-in 62%, gather-scatter 43%, scatter-gather 37%. Stack and bipartite have no rule (mostly "no pattern").
+
+**What I think it means:** fan-out, gather-scatter and scatter-gather rules are precise. The cycle rule is too loose on accidental loops and too short to see real cycles.
+
+## Run 15 - pattern statistics from the dataset's own pattern file
+
+- **Date:** (fill in)
+- **Commit:** (fill in)
+- **Command:** `python -m scripts.pattern_stats HI-Small` (attempts finished before the training cutoff, 2022-09-06 13:36: 104 of 370)
+
+| Pattern | Attempts | Edges (median / p95) | Span in hours (median / p95) | Notes |
+|---|---:|---|---|---|
+| Cycle | 19 | 3 / 10 | 70 / 90 | gaps up to 77h between transfers |
+| Fan-out | 17 | 4 / 13.6 | 72 / 90 | median 4 destinations, max 16 |
+| Fan-in | 9 | 3 / 13.6 | 54 / 88 | median 3 senders, max 16 |
+| Gather-scatter | 8 | 2 / 6.9 | 6 / 102 | hub: median 2 in, 1 out |
+| Scatter-gather | 9 | 6 / 31 | 80 / 95 | median 3 branches, max 16 |
+| Stack | 8 | 2 / 21 | 60 / 91 | |
+| Bipartite | 22 | 4.5 / 13 | 27 / 45 | |
+| Random | 12 | 2 / 8.4 | 23 / 86 | |
+
+**What I think it means:** patterns last up to about 4 days. The rules' windows (24h, 72h) and sizes (5 accounts, 6 transfers) were too short and too large. Small samples (8 to 22 attempts per type). Next: Run 16, `tune_patterns` on training data only.

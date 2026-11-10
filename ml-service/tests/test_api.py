@@ -11,6 +11,8 @@ def make_client(tmp_path, monkeypatch):
         "src": ["a", "b", "c"], "dst": ["x", "y", "z"], "amt_paid": [10.0, 20.0, 30.0],
         "p": [0.9, 0.5, 0.8], "band": ["confident alert", "uncertain", "confident alert"],
         "label": [1, 0, 1],
+        "ts": ["2022-09-09 01:00", "2022-09-09 02:00", "2022-09-10 03:00"],
+        "group": ["2022-09-09-G01", "2022-09-09-G01", "2022-09-10-G01"],
     }).to_parquet(tmp_path / "T_alerts_test.parquet")
     monkeypatch.setattr(m, "PROCESSED_DIR", tmp_path)
     m._load_alerts.cache_clear()
@@ -40,3 +42,25 @@ def test_missing_dataset_is_404(tmp_path, monkeypatch):
 
 def test_bad_dataset_name_is_400(tmp_path, monkeypatch):
     assert make_client(tmp_path, monkeypatch).get("/alerts", params={"dataset": "../x"}).status_code == 400
+
+
+def test_group_filter_and_group_size(tmp_path, monkeypatch):
+    r = make_client(tmp_path, monkeypatch).get("/alerts", params={"dataset": "T", "group": "2022-09-09-G01"}).json()
+    assert [a["edge_id"] for a in r["alerts"]] == [1, 2]
+    assert r["alerts"][0]["group_size"] == 2 and r["alerts"][0]["ts"] == "2022-09-09 01:00"
+
+
+def test_budget_k_limits_rank(tmp_path, monkeypatch):
+    c = make_client(tmp_path, monkeypatch)
+    assert c.get("/alerts", params={"dataset": "T", "k": 1}).json()["count"] == 2   # rank 1 on each day
+    assert c.get("/days", params={"dataset": "T", "k": 1}).json()["days"][0]["alerts"] == 1
+
+
+def test_evidence_endpoint_and_pattern_in_alerts(tmp_path, monkeypatch):
+    import json
+    c = make_client(tmp_path, monkeypatch)
+    (tmp_path / "T_evidence.json").write_text(json.dumps({"1": {"edge_id": 1, "pattern": "cycle", "label": "Cycle", "reason": "r"}}))
+    m._load_evidence.cache_clear()
+    assert c.get("/evidence", params={"dataset": "T", "edge_ids": "1,2"}).json()["evidence"].keys() == {"1"}
+    assert c.get("/alerts", params={"dataset": "T"}).json()["alerts"][0]["pattern"] == "Cycle"
+    assert c.get("/evidence", params={"dataset": "T", "edge_ids": "1;drop"}).status_code == 400
