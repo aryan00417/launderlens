@@ -87,7 +87,7 @@ def main(name):
     rows = []
     for w in (24, 48, 96):
         for k in (3, 4, 5, 8):
-            E.FAN_WIN, E.FAN_MIN = w * H, k
+            E.FAN_WIN, E.FAN_MIN_OUT, E.FAN_MIN_IN = w * H, k, k
             row = {"window_h": w, "min_accounts": k}
             for typ, rule in (("FAN-OUT", "fan_out"), ("FAN-IN", "fan_in")):
                 ids = pos[pos.typology == typ].edge_id.to_numpy()

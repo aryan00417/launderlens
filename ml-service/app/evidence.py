@@ -5,12 +5,15 @@ import numpy as np
 import pandas as pd
 
 H = 3600
-WIN_BEFORE, WIN_AFTER = 72 * H, 24 * H     # window around the alert for cycles and two-hop patterns
-FAN_WIN = 24 * H                            # window either side of the alert for fan-in / fan-out
+# Limits below were chosen from training-period data (scripts/tune_patterns.py): real patterns span up to
+# about 4 days, cycles reach 10 transfers, and a typical fan has 3-4 accounts.
+WIN_BEFORE, WIN_AFTER = 96 * H, 96 * H      # window around the alert for cycles and two-hop patterns
+FAN_WIN = 48 * H                            # window either side of the alert for fan-in / fan-out
+GATHER_WIN = 24 * H                         # window either side of the alert for gather-scatter
 CHAIN_WIN = 48 * H
-FAN_MIN = 5                                 # distinct accounts needed for a fan
+FAN_MIN_OUT, FAN_MIN_IN = 5, 4              # distinct accounts needed for a fan
 GATHER_MIN = 3                              # distinct accounts needed for gather/scatter layers
-MAX_CYCLE = 6
+MAX_CYCLE = 10
 CAP = 30                                    # neighbours explored per account
 BUDGET = 400                                # accounts visited per cycle search
 AMT_TOL = None                              # e.g. (0.8, 1.25): money passed on must stay within this ratio
@@ -162,8 +165,8 @@ def find_scatter_gather(g, e):
 def find_gather_scatter(g, e):
     t = g.t[e]
     for x in (g.d[e], g.s[e]):
-        ins = g.in_edges(x, t - FAN_WIN, t + FAN_WIN)
-        outs = g.out_edges(x, t - FAN_WIN, t + FAN_WIN)
+        ins = g.in_edges(x, t - GATHER_WIN, t + GATHER_WIN)
+        outs = g.out_edges(x, t - GATHER_WIN, t + GATHER_WIN)
         a, b = len(set(g.s[ins])), len(set(g.d[outs]))
         if a >= GATHER_MIN and b >= GATHER_MIN and g.t[ins].min() <= g.t[outs].max():
             is_in = g.d[e] == x
@@ -175,23 +178,30 @@ def find_gather_scatter(g, e):
     return None
 
 
-def find_fan(g, e):
-    t = g.t[e]
-    u, v = g.s[e], g.d[e]
+def find_fan_out(g, e):
+    t, u = g.t[e], g.s[e]
     outs = g.out_edges(u, t - FAN_WIN, t + FAN_WIN)
+    k = len(set(g.d[outs]))
+    if k < FAN_MIN_OUT:
+        return None
+    return {"pattern": "fan_out", "edges": _keep(g, _first_per(g, outs, g.d), e, MAX_SHOWN),
+            "reason": f"{g.names[u]} sent money to {k} different accounts within {_span(g, outs)}. "
+                      "Splitting funds across many accounts is a common way to keep each transfer small."}
+
+
+def find_fan_in(g, e):
+    t, v = g.t[e], g.d[e]
     ins = g.in_edges(v, t - FAN_WIN, t + FAN_WIN)
-    k_out, k_in = len(set(g.d[outs])), len(set(g.s[ins]))
-    if k_out >= FAN_MIN and k_out >= k_in:
-        edges = _keep(g, _first_per(g, outs, g.d), e, MAX_SHOWN)
-        return {"pattern": "fan_out", "edges": edges,
-                "reason": f"{g.names[u]} sent money to {k_out} different accounts within {_span(g, outs)}. "
-                          "Splitting funds across many accounts is a common way to keep each transfer small."}
-    if k_in >= FAN_MIN:
-        edges = _keep(g, _first_per(g, ins, g.s), e, MAX_SHOWN)
-        return {"pattern": "fan_in", "edges": edges,
-                "reason": f"{g.names[v]} received money from {k_in} different accounts within {_span(g, ins)}. "
-                          "Collecting many payments into one account is a common first step of laundering."}
-    return None
+    k = len(set(g.s[ins]))
+    if k < FAN_MIN_IN:
+        return None
+    return {"pattern": "fan_in", "edges": _keep(g, _first_per(g, ins, g.s), e, MAX_SHOWN),
+            "reason": f"{g.names[v]} received money from {k} different accounts within {_span(g, ins)}. "
+                      "Collecting many payments into one account is a common first step of laundering."}
+
+
+def find_fan(g, e):
+    return find_fan_out(g, e) or find_fan_in(g, e)
 
 
 def _first_per(g, idx, who):
@@ -232,18 +242,17 @@ def find_chain(g, e):
                       f"within {_span(g, edges)}, each account passing it straight on."}
 
 
+RULES = (find_cycle, find_scatter_gather, find_gather_scatter, find_fan_out, find_fan_in, find_chain)
+
+
 def explain(g, e):
     """The evidence subgraph for alert edge e (a row index), ready to send to the browser."""
     e = int(e)
-    found = None
-    for rule in (find_cycle, find_scatter_gather, find_gather_scatter, find_fan, find_chain):
-        found = rule(g, e)
-        if found:
-            break
-    if not found:
-        found = {"pattern": "none", "edges": [e],
-                 "reason": "The model rates this transfer as high risk, but no multi-account pattern was found in the "
-                           "surrounding activity. Review the history of both accounts."}
+    hits = [r for r in (rule(g, e) for rule in RULES) if r]
+    found = hits[0] if hits else {"pattern": "none", "edges": [e],
+        "reason": "The model rates this transfer as high risk, but no multi-account pattern was found in the "
+                  "surrounding activity. Review the history of both accounts."}
+    also = [h["pattern"] for h in hits[1:]]
     core = list(dict.fromkeys(int(x) for x in found["edges"]))
     nodes = {int(g.s[i]) for i in core} | {int(g.d[i]) for i in core}
 
@@ -264,6 +273,7 @@ def explain(g, e):
     out_edges = [edge(i, True) for i in core] + [edge(i, False) for i in context]
     ids = {x for ed in out_edges for x in (ed["src"], ed["dst"])}
     return {"edge_id": int(g.edge_id[e]), "pattern": found["pattern"], "label": LABELS[found["pattern"]],
-            "reason": found["reason"], "size": {"edges": len(core), "accounts": len(nodes)},
+            "reason": found["reason"], "also": [LABELS[x] for x in also], "matches": [found["pattern"], *also],
+            "size": {"edges": len(core), "accounts": len(nodes)},
             "alert_src": str(g.names[g.s[e]]), "alert_dst": str(g.names[g.d[e]]),
             "nodes": sorted(ids), "edges": sorted(out_edges, key=lambda x: x["t"])}

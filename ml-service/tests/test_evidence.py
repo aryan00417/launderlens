@@ -75,3 +75,9 @@ def test_amount_tolerance_removes_chance_cycles():
         assert pattern(good, 0)["pattern"] == "cycle"
     finally:
         E.AMT_TOL = None
+
+
+def test_all_matching_patterns_are_listed():
+    rows = [(f"S{i}", "X", T(1, i), 100) for i in range(3)] + [("X", f"R{i}", T(2, i), 90) for i in range(6)]
+    r = pattern(rows, 3)                      # X -> R0: X gathers from 3 accounts and also fans out to 6
+    assert r["pattern"] == "gather_scatter" and "fan_out" in r["matches"] and "Fan-out" in r["also"]

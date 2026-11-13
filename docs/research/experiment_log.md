@@ -479,3 +479,33 @@ Real alerts are 69% of the queue, so the cycle rule is worse than no information
 | Random | 12 | 2 / 8.4 | 23 / 86 | |
 
 **What I think it means:** patterns last up to about 4 days. The rules' windows (24h, 72h) and sizes (5 accounts, 6 transfers) were too short and too large. Small samples (8 to 22 attempts per type). Next: Run 16, `tune_patterns` on training data only.
+
+
+---
+
+## Run 16 - pattern matcher limits chosen from training data
+
+- **Date:** (fill in)
+- **Commit:** (fill in)
+- **Command:** `python -m scripts.tune_patterns HI-Small` (189 s)
+- **Data:** 1,178 pattern edges from the training period (scatter-gather 227, gather-scatter 216, stack 169, bipartite 139, fan-out 137, fan-in 117, cycle 113, random 60). "False" = share of 1,500 random clean transactions from the second half of the training period on which the rule also fires. Test days not used.
+- **Amounts:** paid(next) / received(previous) inside patterns: cycle median 0.98 (p25 0.80, p75 1.17, p5 0.04, p95 76); stack 0.99; random 0.98; gather-scatter 1.28; scatter-gather 1.11.
+
+| Cycle setting | Recall | False |
+|---|---:|---:|
+| 24h window, 6 transfers | 0.186 | 0.001 |
+| 96h, 6 transfers | 0.442 | 0.001 |
+| **96h, 10 transfers** | **0.708** | **0.001** |
+| 96h, 10, amount within 0.8-1.25 | 0.381 | 0.001 |
+| 96h, 10, amount within 0.5-2.0 | 0.416 | 0.001 |
+
+| Fan setting | Fan-out recall / false | Fan-in recall / false |
+|---|---|---|
+| 24h, 5 accounts | 0.788 / 0.262 | 0.667 / 0.026 |
+| 48h, 4 accounts | 0.912 / 0.437 | 0.889 / 0.075 |
+| 48h, 5 accounts | 0.869 / 0.329 | 0.821 / 0.041 |
+| 96h, 5 accounts | 0.927 / 0.420 | 0.949 / 0.067 |
+
+**Chosen:** cycles 96h and up to 10 transfers, no amount check; fans 48h window, 5 accounts for fan-out and 4 for fan-in; gather-scatter window stays 24h. Added: list of all matching patterns, purity and coverage against ground truth.
+
+**What I think it means:** widening the cycle window and length fixes recall at almost no cost on ordinary traffic. Fan-out fires on 33% of ordinary transactions (busy accounts), so it is weak evidence alone. Caution: alerts are concentrated around busy and suspicious accounts, so the false rate on ordinary transactions may understate false cycle matches in the queue. Run 17 re-runs `build_evidence` on the test alerts to check this.

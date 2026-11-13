@@ -136,6 +136,7 @@ export default function GraphExplorer() {
           <aside className="panel">
             <span className="badge ok">{ev.label}</span>
             <p>{ev.reason}</p>
+            {ev.also?.length > 0 && <p className="muted small">Also matches: {ev.also.join(", ")}.</p>}
             <p className="muted small">{ev.size.edges} transactions between {ev.size.accounts} accounts explain this alert.</p>
             {selected && (
               <>
